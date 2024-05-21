@@ -21,7 +21,7 @@ Make sure your application has the necessary permissions to interact with the pr
 * Application: Timestamped messages are written to files by functions using fprintf. graciously handles file opening problems.
 # Payload Manipulation (encryptDecryptPayload and manipulateKernelDataWithPayload):
 * Goal: Modifies kernel data objects and encrypts and decrypts payloads.
-* Application: Using encryptDecrypt for implementationWhen encrypting or decrypting data, payload XORs the data with ENCRYPTION_KEY. manipulateKernelDataWithPayload uses the payload to determine which kernel_obj data fields (data1, data2, description) to set.
+* Application: Using encryptDecrypt for implementation. When encrypting or decrypting data, payload XORs the data with ENCRYPTION_KEY. manipulateKernelDataWithPayload uses the payload to determine which kernel_obj data fields (data1, data2, description) to set.
 # Custom Payload Input (readCustomPayload):
 * Goal: Reads user input to create a bespoke payload.
 * Application: To read input from stdin, use getline. returns the payload after removing the trailing newline.
