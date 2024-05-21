@@ -16,44 +16,44 @@ Make sure your application has the necessary permissions to interact with the pr
 
 #  Features Implemented (WIP):
 
-# Logging Functions (logMessage and logPayloadHistory):
+- Logging Functions (logMessage and logPayloadHistory):
 * Goal: Records payload history and messages in the corresponding log files, payload_history.log and iokit-interactions.log.
 * Application: Timestamped messages are written to files by functions using fprintf. graciously handles file opening problems.
-# Payload Manipulation (encryptDecryptPayload and manipulateKernelDataWithPayload):
+- Payload Manipulation (encryptDecryptPayload and manipulateKernelDataWithPayload):
 * Goal: Modifies kernel data objects and encrypts and decrypts payloads.
 * Application: Using encryptDecrypt for implementation. When encrypting or decrypting data, payload XORs the data with ENCRYPTION_KEY. manipulateKernelDataWithPayload uses the payload to determine which kernel_obj data fields (data1, data2, description) to set.
-# Custom Payload Input (readCustomPayload):
+- Custom Payload Input (readCustomPayload):
 * Goal: Reads user input to create a bespoke payload.
 * Application: To read input from stdin, use getline. returns the payload after removing the trailing newline.
-# Pattern-Based Payload Generation (generatePatternPayload):
+- Pattern-Based Payload Generation (generatePatternPayload):
 * Goal: Produces a payload by utilizing a pattern and repeat count entered by the user.
 * Application: Sets aside memory for payload, iterates the pattern according to the instructions, and ends with null terminator.
-# Sending Payload to Kernel (sendPayloadToKernel):
+- Sending Payload to Kernel (sendPayloadToKernel):
 * Goal: Delivers the ready-to-use payload to the kernel service.
 * Application: To send kernel_obj to the MyKernelService, use the IOConnectCallMethod. applies retry logic (MAX_RETRY_ATTEMPTS) in the event of an error.
-# Memory Integrity Check (memoryIntegrityCheck):
+- Memory Integrity Check (memoryIntegrityCheck):
 * Goal: Provides kernel_obj with memory protection.
 * Application: Read-only protection for kernel_obj is set via mprotect.
-# Executing System Command (executeSystemCommand):
+- Executing System Command (executeSystemCommand):
 * Goal: Executes a system command.
 * Application: Uses system to execute commands and logs success/failure messages.
-# Menu Display (showMenu):
+- Menu Display (showMenu):
 * Goal: Displays a menu for user interaction.
 * Application: Prints choices to run system commands, transmit custom, predefined payloads based on patterns, and exit.
-# Threaded Payload Sending (threadedSendPayload):
+- Threaded Payload Sending (threadedSendPayload):
 * Goal: Sends payload to kernel in a separate thread.
 * Application: uses IOServiceOpen to open MyKernelService on a different thread and sends kernel_obj.
-# Interaction with plist (Info.plist) and MyKernelService:
+- Interaction with plist (Info.plist) and MyKernelService:
 * Info.plist: gives application metadata, including version and bundle identifier. MacOS needs to recognize and control the application.
 * MyKernelService: represents the com.example.MyKernelService kernel-level service that your user-space application uses to interact via IOKit.
 
 # Points of integration (WIP):
 
-# Service Matching (IOServiceMatching(SERVICE_NAME)):
+- Service Matching (IOServiceMatching(SERVICE_NAME)):
 * Uses IOServiceGetMatchingService and IOServiceOpen to locate and communicate with MyKernelService.
-# IOConnectCallMethod:
+- IOConnectCallMethod:
 * Sends kernel_obj via calling methods on MyKernelService.
-# Logging and Security:
+- Logging and Security:
 * Logging features make sure that actions are recorded for auditing and troubleshooting.
 * After alteration, memory protection (memoryIntegrityCheck) secures kernel_obj.
 
