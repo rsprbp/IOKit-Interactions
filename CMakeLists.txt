@@ -3,7 +3,7 @@ project(untitled C)
 
 set(CMAKE_C_STANDARD 99)
 
-add_executable(untitled main.c)
+add_executable(untitled iokit-interactions.c)
 
 # Link the IOKit framework
 target_link_libraries(untitled "-framework IOKit")
