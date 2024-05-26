@@ -7,25 +7,25 @@ Remember to ensure that the required libraries (zlib and IOKit) are appropriatel
 
 #  logMessage(const char *message)
 Logs a message with a timestamp to "iokit-interactions.log".
-Parameters:
+- Parameters:
 message: The message to log.
 Example: logMessage("Starting service...");
 
 #  logPayloadHistory(const char *payload)
 Logs a payload with a timestamp to "payload_history.log".
-Parameters:
+- Parameters:
 payload: The payload data to log.
 Example: logPayloadHistory("Payload data");
 
 #  encryptDecryptPayload(char *payload)
 Encrypts or decrypts a payload using XOR with a predefined key.
-Parameters:
+- Parameters:
 payload: The payload to encrypt or decrypt.
 Example: encryptDecryptPayload(payloadData);
 
 #  compressPayload(char *payload, char **compressedPayload, size_t *compressedSize)
 Compresses a payload using zlib.
-Parameters:
+- Parameters:
 payload: The payload to compress.
 compressedPayload: Pointer to store the compressed payload.
 compressedSize: Pointer to store the size of the compressed payload.
@@ -33,7 +33,7 @@ Example: compressPayload(payloadData, &compressedData, &compressedSize);
 
 #  decompressPayload(char *compressedPayload, size_t compressedSize, char **decompressedPayload)
 Decompresses a payload using zlib.
-Parameters:
+- Parameters:
 compressedPayload: The compressed payload to decompress.
 compressedSize: The size of the compressed payload.
 decompressedPayload: Pointer to store the decompressed payload.
@@ -41,20 +41,20 @@ Example: decompressPayload(compressedData, compressedSize, &decompressedData);
 
 #  secureFree(void *ptr, size_t size)
 Securely frees memory by zeroing it out before freeing.
-Parameters:
+- Parameters:
 ptr: Pointer to the memory to free.
 size: Size of the memory to zero out.
 Example: secureFree(dataPtr, dataSize);
 
 #  signalHandler(int signum)
 Handles signals and exits the program.
-Parameters:
+- Parameters:
 signum: Signal number received.
 Example: This function is used internally for signal handling.
 
 #  manipulateKernelDataWithPayload(struct kernel_data_object *obj, const char *payload)
 Manipulates a kernel data object with the provided payload.
-Parameters:
+- Parameters:
 obj: Pointer to the kernel data object.
 payload: Payload to manipulate the object with.
 Example: manipulateKernelDataWithPayload(&kernelObj, payloadData);
@@ -66,14 +66,14 @@ Example: io_service_t service = getService();
 
 #  io_connect_t openConnection(io_service_t service)
 Opens a connection to the IOKit service.
-Parameters:
+- Parameters:
 service: The IOKit service object.
 Returns: The connection object.
 Example: io_connect_t connect = openConnection(service);
 
 #  sendPayloadToKernel(io_connect_t connect, struct kernel_data_object *obj)
 Sends a payload to the kernel via the IOKit connection.
-Parameters:
+- Parameters:
 connect: The IOKit connection object.
 obj: The kernel data object containing the payload.
 Example: sendPayloadToKernel(connect, &kernelObj);
