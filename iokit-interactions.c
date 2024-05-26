@@ -1,4 +1,4 @@
-//IOKit-Interactions by rsprbp
+// IOKit-Interactions by rsprbp
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -7,6 +7,8 @@
 #include <IOKit/IOKitLib.h>
 #include <unistd.h>
 #include <sys/mman.h>
+#include <zlib.h> 
+#include <signal.h> 
 
 #define SERVICE_NAME "com.example.MyKernelService"
 #define MAX_RETRY_ATTEMPTS 3
@@ -41,7 +43,7 @@ void logPayloadHistory(const char *payload) {
                 t->tm_hour, t->tm_min, t->tm_sec, payload);
         fclose(historyFile);
     } else {
-        printf("Failed to open payload history file\n");
+        printf("Failed to open payload history, invalid file\n");
     }
 }
 
@@ -51,209 +53,163 @@ void encryptDecryptPayload(char *payload) {
     }
 }
 
+void compressPayload(char *payload, char **compressedPayload, size_t *compressedSize) {
+    uLong srcLen = strlen(payload) + 1;
+    uLong destLen = compressBound(srcLen);
+    *compressedPayload = (char *)malloc(destLen);
+
+    if (compress((Bytef *)*compressedPayload, &destLen, (const Bytef *)payload, srcLen) == Z_OK) {
+        *compressedSize = destLen;
+    } else {
+        free(*compressedPayload);
+        *compressedPayload = NULL;
+        *compressedSize = 0;
+    }
+}
+
+void decompressPayload(char *compressedPayload, size_t compressedSize, char **decompressedPayload) {
+    uLong destLen = 256;
+    *decompressedPayload = (char *)malloc(destLen);
+
+    if (uncompress((Bytef *)*decompressedPayload, &destLen, (const Bytef *)compressedPayload, compressedSize) != Z_OK) {
+        free(*decompressedPayload);
+        *decompressedPayload = NULL;
+    }
+}
+
+void secureFree(void *ptr, size_t size) {
+    if (ptr) {
+        memset(ptr, 0, size);
+        free(ptr);
+    }
+}
+
+void signalHandler(int signum) {
+    printf("Signal %d received. Exiting.\n", signum);
+    exit(signum);
+}
+
 void manipulateKernelDataWithPayload(struct kernel_data_object *obj, const char *payload) {
     if (!obj) {
         printf("Invalid kernel object pointer\n");
         logMessage("Invalid kernel object pointer");
         return;
     }
-    obj->data1 = 0xdeadbeef;
+    obj->data1 = 0xdeadbeef; //lol you love to see this and you know it
     strncpy(obj->description, payload, sizeof(obj->description) - 1);
     obj->description[sizeof(obj->description) - 1] = '\0';
     printf("Manipulated kernel data:\n");
     printf("data1: 0x%llx\n", obj->data1);
-    printf("data2: 0x%llx\n", obj->data2);
     printf("description: %s\n", obj->description);
-    logMessage("Kernel data manipulated");
+    logPayloadHistory(payload);
 }
 
-char *readCustomPayload() {
-    printf("Enter your custom payload:\n");
-    char *payload = NULL;
-    size_t len = 0;
-    ssize_t read;
-
-    if ((read = getline(&payload, &len, stdin)) == -1) {
-        printf("Failed to read payload\n");
-        logMessage("Failed to read payload");
-        return NULL;
-    }
-
-    payload[strcspn(payload, "\n")] = '\0';
-    return payload;
-}
-
-char *generatePatternPayload(const char *pattern, int repeat) {
-    int pattern_length = strlen(pattern);
-    int total_length = pattern_length * repeat;
-    char *payload = (char *)malloc(total_length + 1);
-    if (!payload) {
-        printf("Memory allocation failed for payload\n");
-        logMessage("Memory allocation failed for payload");
-        return NULL;
-    }
-
-    for (int i = 0; i < repeat; ++i) {
-        strncpy(payload + (i * pattern_length), pattern, pattern_length);
-    }
-    payload[total_length] = '\0';
-    return payload;
-}
-
-bool sendPayloadToKernel(io_connect_t connect, struct kernel_data_object *kernel_obj) {
-    kern_return_t kr;
-    for (int attempt = 0; attempt < MAX_RETRY_ATTEMPTS; ++attempt) {
-        kr = IOConnectCallMethod(connect, 0, NULL, 0, kernel_obj, sizeof(*kernel_obj), NULL, NULL, NULL, NULL);
-        if (kr == KERN_SUCCESS) {
-            printf("Payload sent to kernel successfully\n");
-            logMessage("Payload sent to kernel successfully");
-            logPayloadHistory(kernel_obj->description);
-            return true;
-        } else {
-            printf("Failed to send payload to kernel, attempt %d\n", attempt + 1);
-            logMessage("Failed to send payload to kernel, retrying...");
-            sleep(1);
-        }
-    }
-    printf("All attempts to send payload to kernel failed\n");
-    logMessage("All attempts to send payload to kernel failed");
-    return false;
-}
-
-void memoryIntegrityCheck(struct kernel_data_object *obj) {
-    if (mprotect(obj, sizeof(*obj), PROT_READ) == -1) {
-        perror("Memory protection failed");
-        logMessage("Memory protection failed");
-    } else {
-        printf("Memory protection applied successfully\n");
-        logMessage("Memory protection applied successfully");
-    }
-}
-
-void executeSystemCommand(const char *command) {
-    printf("Executing system command: %s\n", command);
-    logMessage("Executing system command");
-    int result = system(command);
-    if (result != -1) {
-        printf("Command executed successfully\n");
-        logMessage("Command executed successfully");
-    } else {
-        printf("Command execution failed\n");
-        logMessage("Command execution failed");
-    }
-}
-
-void showMenu() {
-    printf("1. Send predefined payload\n");
-    printf("2. Send custom payload\n");
-    printf("3. Send pattern-based payload\n");
-    printf("4. Execute system command\n");
-    printf("5. Exit\n");
-}
-
-void *threadedSendPayload(void *arg) {
-    struct kernel_data_object *kernel_obj = (struct kernel_data_object *)arg;
-    io_connect_t connect;
-    kern_return_t kr = IOServiceOpen(IOServiceGetMatchingService(kIOMasterPortDefault, IOServiceMatching(SERVICE_NAME)), mach_task_self(), 0, &connect);
-    if (kr != KERN_SUCCESS) {
-        printf("Failed to open service in thread\n");
-        logMessage("Failed to open service in thread");
-        return NULL;
-    }
-
-    sendPayloadToKernel(connect, kernel_obj);
-    IOServiceClose(connect);
-    return NULL;
-}
-
-int main(int argc, char *argv[]) {
-    kern_return_t kr;
-    io_service_t service;
-    io_connect_t connect;
-
-    service = IOServiceGetMatchingService(kIOMasterPortDefault, IOServiceMatching(SERVICE_NAME));
+io_service_t getService() {
+    io_service_t service = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching(SERVICE_NAME));
     if (!service) {
-        printf("Failed to find service\n");
         logMessage("Failed to find service");
-        return -1;
+    }
+    return service;
+}
+
+io_connect_t openConnection(io_service_t service) {
+    io_connect_t connect = MACH_PORT_NULL;
+    kern_return_t result = IOServiceOpen(service, mach_task_self(), 0, &connect);
+    if (result != KERN_SUCCESS) {
+        logMessage("Failed to open connection to service");
+    }
+    return connect;
+}
+
+void sendPayloadToKernel(io_connect_t connect, struct kernel_data_object *obj) {
+    kern_return_t result = IOConnectCallStructMethod(connect, 0, obj, sizeof(*obj), NULL, 0);
+    if (result != KERN_SUCCESS) {
+        logMessage("Failed to send payload to kernel");
+    } else {
+        logMessage("Payload sent to kernel successfully");
+    }
+}
+
+int main() {
+    signal(SIGSEGV, signalHandler); // memory handling signal (still wip)
+
+    io_service_t service = getService();
+    if (!service) {
+        return 1;
     }
 
-    kr = IOServiceOpen(service, mach_task_self(), 0, &connect);
-    if (kr != KERN_SUCCESS) {
-        printf("Failed to open service\n");
-        logMessage("Failed to open service");
+    io_connect_t connect = openConnection(service);
+    if (!connect) {
         IOObjectRelease(service);
-        return -1;
+        return 1;
     }
 
     struct kernel_data_object kernel_obj = {0};
-    const char *exploit_payload1 = "insert your payload here";
-
-    manipulateKernelDataWithPayload(&kernel_obj, exploit_payload1);
-    sendPayloadToKernel(connect, &kernel_obj);
-
-    memoryIntegrityCheck(&kernel_obj);
-
-    int choice;
     char *custom_payload = NULL;
-    char system_command[256];
+    char *compressed_payload = NULL;
+    size_t compressed_size = 0;
+    int choice = 0;
 
     while (1) {
-        showMenu();
+        printf("1. Default Payload\n");
+        printf("2. Custom Payload\n");
+        printf("3. Pattern Payload\n");
+        printf("4. System Command\n");
+        printf("5. Exit\n");
         printf("Enter your choice: ");
         scanf("%d", &choice);
-        getchar();  
+        getchar(); 
 
         switch (choice) {
             case 1:
-                printf("Sending predefined payload\n");
-            manipulateKernelDataWithPayload(&kernel_obj, exploit_payload1);
-            sendPayloadToKernel(connect, &kernel_obj);
-            break;
-            case 2:
-                custom_payload = readCustomPayload();
-            if (custom_payload) {
-                encryptDecryptPayload(custom_payload);  
-                manipulateKernelDataWithPayload(&kernel_obj, custom_payload);
+                manipulateKernelDataWithPayload(&kernel_obj, "Default Payload");
                 sendPayloadToKernel(connect, &kernel_obj);
-                encryptDecryptPayload(custom_payload);  
-                free(custom_payload);
-            }
-            break;
+                break;
+            case 2:
+                printf("Enter custom payload: ");
+                char customPayload[256];
+                if (fgets(customPayload, sizeof(customPayload), stdin)) {
+                    customPayload[strcspn(customPayload, "\n")] = '\0';
+                    encryptDecryptPayload(customPayload);
+                    manipulateKernelDataWithPayload(&kernel_obj, customPayload);
+                    sendPayloadToKernel(connect, &kernel_obj);
+                    encryptDecryptPayload(customPayload); // restore
+                }
+                break;
             case 3:
-            {
-                printf("Enter pattern for payload: ");
+                printf("Enter a pattern for payload: ");
                 char pattern[256];
                 if (fgets(pattern, sizeof(pattern), stdin)) {
                     pattern[strcspn(pattern, "\n")] = '\0';
                     int repeat;
-                    printf("Enter number of times to repeat pattern: ");
+                    printf("Enter the number of times to repeat pattern: ");
                     scanf("%d", &repeat);
-                    getchar();  // Consume newline character left in buffer
-                    custom_payload = generatePatternPayload(pattern, repeat);
-                    if (custom_payload) {
-                        manipulateKernelDataWithPayload(&kernel_obj, custom_payload);
-                        sendPayloadToKernel(connect, &kernel_obj);
-                        free(custom_payload);
+                    getchar(); 
+                    custom_payload = (char *)malloc(strlen(pattern) * repeat + 1);
+                    for (int i = 0; i < repeat; ++i) {
+                        strcat(custom_payload, pattern);
                     }
+                    manipulateKernelDataWithPayload(&kernel_obj, custom_payload);
+                    sendPayloadToKernel(connect, &kernel_obj);
+                    free(custom_payload);
                 }
-            }
-            break;
+                break;
             case 4:
-                printf("Enter system command to execute: ");
-            if (fgets(system_command, sizeof(system_command), stdin)) {
-                system_command[strcspn(system_command, "\n")] = '\0';
-                executeSystemCommand(system_command);
-            }
-            break;
+                printf("Enter a system command to execute: ");
+                char system_command[256];
+                if (fgets(system_command, sizeof(system_command), stdin)) {
+                    system_command[strcspn(system_command, "\n")] = '\0';
+                    system(system_command);
+                }
+                break;
             case 5:
                 printf("Exiting program\n");
-            IOServiceClose(connect);
-            IOObjectRelease(service);
-            return 0;
+                IOServiceClose(connect);
+                IOObjectRelease(service);
+                return 0;
             default:
                 printf("Invalid choice\n");
-            break;
+                break;
         }
     }
 
